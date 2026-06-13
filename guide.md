@@ -1,5 +1,24 @@
 # How to Effectively Use LLMs for Software Development
 
+**Who this is for:** anyone who wants to get better results from AI coding
+assistants — whether you write code daily or are just trying to understand how
+these tools work. Parts 1 and 2 are conceptual and assume no programming
+background. Parts 3 and 4 get more hands-on and use coding examples, but the
+ideas behind them apply to anyone directing an AI assistant.
+
+**TL;DR:** An AI assistant is a stack of layers wrapped around a language model
+that, by itself, has no memory and only ever sees the information you hand it
+each turn. So using one well comes down to a single skill: deliberately control
+what goes into that context, keep the noise out, and verify what comes back.
+Everything below is that one idea applied in different places.
+
+## Contents
+
+- [Part 1: The Anatomy of an AI Coding Assistant](#part-1-the-anatomy-of-an-ai-coding-assistant) — what the pieces are
+- [Part 2: What Makes Each Layer Effective](#part-2-what-makes-each-layer-effective) — how to use each one well
+- [Part 3: A Worked Example — Building a Program End to End](#part-3-a-worked-example--building-a-program-end-to-end) — the principles in practice
+- [Part 4: Quirks, Tips, and Folklore](#part-4-quirks-tips-and-folklore) — hard-won lessons and gotchas
+
 ## Part 1: The Anatomy of an AI Coding Assistant
 
 Before talking about *how* to use an AI assistant effectively, it helps to know
@@ -33,6 +52,10 @@ flowchart LR
     end
 ```
 
+*Diagram summary: four nested boxes, outermost to innermost — **INTERFACE**
+contains **HARNESS**, which contains **AGENT**, which contains the **MODEL** at
+the center. You interact with the outside; the model sits at the core.*
+
 | Layer | Role |
 |-------|------|
 | **Interface** | Where you interact — CLI, IDE extension, web chat |
@@ -56,6 +79,11 @@ flowchart LR
     Observe -->|done| Answer([Result])
 ```
 
+*Diagram summary: a repeating cycle. Your goal feeds into the model planning the
+next step → the agent requesting a tool call → the harness executing it (file,
+shell, MCP, or API) → the model observing the result. If the task isn't done, it
+loops back to planning; when it's done, it returns the result.*
+
 Each time the model plans, the harness hands it a freshly assembled context:
 
 ```
@@ -71,7 +99,9 @@ Context assembled every turn:
 **Model** — The large language model itself: the trained weights (Claude, GPT,
 etc.). It is essentially a stateless function — text in, text out. It has no
 memory between calls, can't run code, and can't read your files on its own. On
-its own it only predicts the next token. Everything else in the stack exists to
+its own it only predicts the next token (a *token* is a chunk of text — roughly
+a word or word-fragment — that the model reads and writes one at a time).
+Everything else in the stack exists to
 give that prediction *something useful to act on*.
 
 **Agent** — The control loop wrapped around the model that turns prediction into
@@ -95,6 +125,24 @@ reasoning happens.
 > A useful mental model: the **model** thinks, the **agent** decides what to do
 > with that thinking, the **harness** carries it out and reports back, and the
 > **interface** lets you watch and steer.
+
+#### Examples in the wild
+
+In real products these layers are usually **bundled together** — one name often
+spans the agent, harness, and interface at once. The model is typically the one
+piece you can swap out. A few concrete examples:
+
+| Layer | Examples |
+|-------|----------|
+| **Model** | Claude (Anthropic), GPT (OpenAI), Gemini (Google) |
+| **Agent + Harness** | Claude Code, Cursor's agent mode, GitHub Copilot |
+| **Interface** | *CLI:* Claude Code, Kiro CLI. *IDE:* Cursor, GitHub Copilot. *Web chat:* ChatGPT, Claude.ai. |
+
+Why bother separating layers that ship together? Because when something goes
+wrong, knowing *which* layer is responsible tells you where to fix it: a clumsy
+diff view is an **interface** problem, tools not running is a **harness**
+problem, poor step-by-step decisions are an **agent** problem, and a confident
+falsehood is a **model** problem.
 
 ### Three things that shape behavior
 
@@ -165,7 +213,9 @@ from.
 - **Be specific about the goal and the done-condition.** "Fix the bug" invites a
   guess; "the test `test_retry_backoff` fails with a timeout, find why and fix
   it" gives the model something to verify against.
-- **Mind the context window.** Long sessions accumulate noise — stale file
+- **Mind the context window.** The *context window* is the limited amount of
+  text the model can take in at once — everything in this turn's context
+  competes for that finite space. Long sessions accumulate noise — stale file
   contents, abandoned approaches, dead ends. When a conversation drifts or the
   model starts repeating mistakes, it's often context rot. Start fresh, or
   summarize the state and continue from a clean slate.
@@ -221,11 +271,6 @@ Finally, the loop itself rewards a particular working style.
 - **Match autonomy to risk.** Let it run freely on local, reversible work
   (editing files, running tests). Slow down and confirm on anything destructive
   or hard to undo.
-
-> **The throughline:** every one of these is the same move applied in a
-> different place — put the right things in front of the model, keep the wrong
-> things out, and verify what comes back. Master that, and the rest is detail.
-
 
 
 ---
